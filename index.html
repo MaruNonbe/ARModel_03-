@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Screen Fixed</title>
+  <title>AR Train UI Layout Fix</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
   <style>
-    /* ========== UIデザイン（変更なし） ========== */
+    /* ========== 基本設定（変更なし） ========== */
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden; background: transparent; font-family: sans-serif;
@@ -18,65 +18,65 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* 上部UI */
+    /* ========== UI配置の変更 ========== */
+    
+    /* 上部エリア（機能ボタン） */
     #top-ui-container {
       position: fixed; top: 20px; left: 0; width: 100%;
       z-index: 9999;
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px;
-      pointer-events: none;
+      gap: 10px; pointer-events: none;
     }
 
-    /* 下部UI */
+    /* 下部エリア（コントローラー） */
     #bottom-ui-container {
       position: fixed; bottom: 30px; left: 0; width: 100%;
       z-index: 9999;
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px;
-      pointer-events: none;
+      gap: 10px; pointer-events: none;
     }
 
-    /* 横並びボタン背景 */
+    /* 横並びボタンバー */
     .ui-bar {
-      display: flex; gap: 8px; pointer-events: auto;
-      background: rgba(255, 255, 255, 0.25);
-      padding: 5px 10px;
-      border-radius: 15px;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      display: flex; gap: 10px; pointer-events: auto;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 5px 10px; border-radius: 15px;
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
     }
 
-    /* コントローラー背景 */
+    /* コントローラーパネル */
     .pad-grid {
       display: grid;
-      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.25);
-      padding: 15px;
-      border-radius: 20px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 15px; border-radius: 20px;
       pointer-events: auto;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
     }
 
-    /* ボタン共通 */
+    /* ボタン（白い角丸） */
     .btn {
       width: 60px; height: 60px;
       background: #ffffff;
       border: none; border-radius: 12px;
       display: flex; justify-content: center; align-items: center;
-      font-size: 26px; color: #556677;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      font-size: 24px; font-weight: bold; color: #556677;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
       cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
     }
-    .btn:active { transform: scale(0.96); background: #f5f5f5; }
+    .btn:active { transform: scale(0.95); background: #f0f0f0; }
 
-    .btn-icon {
-      flex-direction: column; gap: 2px; font-size: 10px; color: #333;
-    }
-    .btn-icon span { font-size: 22px; line-height: 1; }
+    /* ボタン内アイコン・文字 */
+    .btn-icon { flex-direction: column; gap: 2px; font-size: 10px; color: #333; }
+    .btn-icon span { font-size: 20px; color: #333; }
     .btn-icon div { font-weight: bold; }
 
-    .btn-stop { background: #ffcccc; color: #d00; font-size: 15px; font-weight: bold; }
+    /* 矢印色 */
+    .pad-grid .btn { color: #5b7fa3; font-size: 28px; }
+
+    /* STOPボタン */
+    .btn-stop { background: #ffcccc; color: #d00; font-size: 16px; }
   </style>
 </head>
 <body>
@@ -84,21 +84,19 @@
 <a-scene
   vr-mode-ui="enabled: false"
   embedded
-  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
   renderer="precision: mediump; antialias: true; alpha: true;"
+  arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
 >
-  <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
+  <a-light type="ambient" color="#FFF" intensity="0.9"></a-light>
   <a-light type="directional" position="-1 2 1" intensity="0.6"></a-light>
 
-  <a-camera position="0 0 0" look-controls="enabled: false">
+  <a-marker-camera preset="hiro">
     <a-entity id="train"
               gltf-model="models/AR-Train_Nagai.glb"
-              position="0 0 -2"
-              rotation="0 0 0"
+              position="0 0 0"
               scale="0.5 0.5 0.5">
     </a-entity>
-  </a-camera>
-
+  </a-marker-camera>
 </a-scene>
 
 <div id="top-ui-container">
@@ -106,9 +104,10 @@
     <div class="btn btn-icon" id="btn-face"><span>🙂</span><div>顔</div></div>
     <div class="btn btn-icon" id="btn-up"><span>⬆</span><div>高</div></div>
     <div class="btn btn-icon" id="btn-down"><span>⬇</span><div>低</div></div>
-    <div class="btn btn-icon" id="btn-zoom-in"><span>🔍+</span></div>
-    <div class="btn btn-icon" id="btn-zoom-out"><span>🔍-</span></div>
+    <div class="btn btn-icon" id="btn-zoom-in"><span>🔍</span><div>+</div></div>
+    <div class="btn btn-icon" id="btn-zoom-out"><span>🔍</span><div>-</div></div>
   </div>
+  
   <div class="ui-bar">
     <div class="btn btn-icon" id="btn-capture"><span>📷</span><div>撮</div></div>
     <div class="btn btn-icon" id="btn-record"><span>🎥</span><div>録</div></div>
@@ -132,10 +131,10 @@
 </div>
 
 <script>
-/* ========== 内部ロジック（変更なし） ========== */
+/* ========== ロジック（変更なし） ========== */
 const train = document.querySelector('#train');
 
-// パラメータ
+// 移動パラメータ
 let speed = 0.05;
 let turnSpeedInPlace = 2.0; 
 let turnSpeedCurve = 1.0;   
@@ -167,20 +166,18 @@ function loop() {
 }
 loop();
 
-/* ボタン操作設定 */
+/* ボタン操作 */
 function setAction(id, moveVal, turnVal) {
   const btn = document.getElementById(id);
   if(!btn) return;
   const start = (e) => { if(e.cancelable) e.preventDefault(); state.moving = moveVal; state.turning = turnVal; };
   const end = (e) => { if(e.cancelable) e.preventDefault(); state.moving = 0; state.turning = 0; };
-
   btn.addEventListener('touchstart', start, {passive:false});
   btn.addEventListener('mousedown', start);
   btn.addEventListener('touchend', end, {passive:false});
   btn.addEventListener('mouseup', end);
   btn.addEventListener('mouseleave', end);
 }
-
 setAction('btn-fwd', 1, 0); 
 setAction('btn-back', -1, 0);
 setAction('btn-turn-left', 0, 1); 
@@ -194,17 +191,15 @@ document.getElementById('btn-stop').addEventListener('click', (e)=>{ e.preventDe
 /* その他機能 */
 document.getElementById('btn-up').onclick = () => train.object3D.position.y += 0.1;
 document.getElementById('btn-down').onclick = () => train.object3D.position.y -= 0.1;
-
 let curScale = 0.5;
-document.getElementById('btn-zoom-in').onclick = () => { curScale += 0.05; train.object3D.scale.set(curScale,curScale,curScale); };
-document.getElementById('btn-zoom-out').onclick = () => { curScale = Math.max(0.1, curScale - 0.05); train.object3D.scale.set(curScale,curScale,curScale); };
-
+document.getElementById('btn-zoom-in').onclick = () => { curScale += 0.1; train.object3D.scale.set(curScale,curScale,curScale); };
+document.getElementById('btn-zoom-out').onclick = () => { curScale = Math.max(0.1, curScale - 0.1); train.object3D.scale.set(curScale,curScale,curScale); };
 document.getElementById('btn-capture').onclick = () => {
   const cvs = document.querySelector('canvas');
-  cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
+  cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar.png'; a.click(); });
 };
 
-/* 顔写真設定 */
+/* 顔写真設定（絶対に見える版） */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
