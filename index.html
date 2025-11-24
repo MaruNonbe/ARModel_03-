@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Face Position Fix</title>
+  <title>AR Train FacePlate Fix</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -181,40 +181,49 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定（位置修正：運転席ウィンドウへ） ========== */
+/* ========== 顔写真設定（Face_Plate対応版） ========== */
 document.getElementById('btn-face').onclick = () => {
+  // モデルがまだ読み込まれていなければ何もしない
+  if (!train.object3D) {
+    alert("モデルの読み込みをお待ちください。");
+    return;
+  }
+
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
   input.onchange = e => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const oldFace = train.object3D.getObjectByName('custom_face');
-    if(oldFace) train.object3D.remove(oldFace);
-
     const url = URL.createObjectURL(file);
     new THREE.TextureLoader().load(url, (tex) => {
       tex.encoding = THREE.sRGBEncoding;
-      tex.flipY = true; 
+      // モデルのUV設定によっては flipY = true が必要な場合があります。
+      // 上下逆になる場合はここを true に変更してください。
+      tex.flipY = false; 
 
-      const geo = new THREE.PlaneGeometry(0.7, 0.7);
-      const mat = new THREE.MeshBasicMaterial({ 
-        map: tex, 
-        side: THREE.DoubleSide, 
-        transparent:true,
-        // ガラスを突き抜けて表示させる
-        depthTest: false,
-        depthWrite: false
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.name = 'custom_face';
-      mesh.renderOrder = 999; 
+      // ★修正点：モデル内の「Face_Plate」を探す
+      const facePlate = train.object3D.getObjectByName('Face_Plate');
 
-      // ★座標修正：右側の運転席へ移動
-      // X=0.65(右), Y=2.35(上), Z=2.5(前面)
-      mesh.position.set(0.65, 2.35, 2.5); 
-      
-      train.object3D.add(mesh);
+      if (facePlate) {
+        console.log("Face_Plate found, applying texture.");
+        // 既存のマテリアルをベースに、テクスチャを適用する
+        if (!facePlate.material.isMaterial) {
+           // マテリアルが未設定の場合の安全策（通常はGLTFロード時に設定される）
+           facePlate.material = new THREE.MeshBasicMaterial();
+        }
+        // テクスチャをセット
+        facePlate.material.map = tex;
+        // 両面表示、透過を有効にする（必要に応じて）
+        facePlate.material.side = THREE.DoubleSide;
+        facePlate.material.transparent = true;
+        // 更新フラグを立てる
+        facePlate.material.needsUpdate = true;
+
+      } else {
+        console.error("Face_Plate not found in the model.");
+        alert("モデル内に「Face_Plate」という名前のオブジェクトが見つかりませんでした。");
+      }
     });
   };
   input.click();
