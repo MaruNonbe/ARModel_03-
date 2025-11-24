@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Spatial Fixed Final</title>
+  <title>AR Train Face Position Fix</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -18,7 +18,7 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* UI配置（上下） */
+    /* 配置（上下に振り分け） */
     #top-ui-container {
       position: fixed; top: 20px; left: 0; width: 100%;
       z-index: 9999;
@@ -78,10 +78,7 @@
   <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
   <a-light type="directional" position="-1 2 1" intensity="0.6"></a-light>
 
-  <a-camera 
-    position="0 1.6 0" 
-    look-controls="enabled: true; touchEnabled: false; mouseEnabled: false; magicWindowTrackingEnabled: true;"
-  ></a-camera>
+  <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
 
   <a-entity id="train"
             gltf-model="models/AR-Train_Nagai.glb"
@@ -184,7 +181,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定 ========== */
+/* ========== 顔写真設定（位置修正：運転席ウィンドウへ） ========== */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -200,11 +197,12 @@ document.getElementById('btn-face').onclick = () => {
       tex.encoding = THREE.sRGBEncoding;
       tex.flipY = true; 
 
-      const geo = new THREE.PlaneGeometry(0.8, 0.8);
+      const geo = new THREE.PlaneGeometry(0.7, 0.7);
       const mat = new THREE.MeshBasicMaterial({ 
         map: tex, 
         side: THREE.DoubleSide, 
         transparent:true,
+        // ガラスを突き抜けて表示させる
         depthTest: false,
         depthWrite: false
       });
@@ -212,7 +210,9 @@ document.getElementById('btn-face').onclick = () => {
       mesh.name = 'custom_face';
       mesh.renderOrder = 999; 
 
-      mesh.position.set(0, 1.6, 2.6); 
+      // ★座標修正：右側の運転席へ移動
+      // X=0.65(右), Y=2.35(上), Z=2.5(前面)
+      mesh.position.set(0.65, 2.35, 2.5); 
       
       train.object3D.add(mesh);
     });
