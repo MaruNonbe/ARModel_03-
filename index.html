@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Spec Compliance</title>
+  <title>AR Train Fixed Scenery 5m</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -18,7 +18,7 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* 上下配置 */
+    /* UI配置（上下振り分け） */
     #top-ui-container {
       position: fixed; top: 20px; left: 0; width: 100%;
       z-index: 9999;
@@ -32,20 +32,24 @@
       gap: 10px; pointer-events: none;
     }
 
-    /* ボタンスタイル */
-    .ui-bar, .pad-grid {
-      background: rgba(255, 255, 255, 0.25);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      pointer-events: auto;
-    }
+    /* ボタン背景（すりガラス風） */
     .ui-bar {
-      display: flex; gap: 8px; padding: 5px 10px; border-radius: 15px;
+      display: flex; gap: 8px; pointer-events: auto;
+      background: rgba(255, 255, 255, 0.25);
+      padding: 5px 10px; border-radius: 15px;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
     .pad-grid {
-      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
+      display: grid;
       grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.25);
+      padding: 15px; border-radius: 20px;
+      pointer-events: auto;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
 
+    /* ボタン共通（白い角丸） */
     .btn {
       width: 60px; height: 60px;
       background: #ffffff; border: none; border-radius: 12px;
@@ -59,6 +63,7 @@
     .btn-icon { flex-direction: column; gap: 2px; font-size: 10px; color: #333; }
     .btn-icon span { font-size: 22px; line-height: 1; }
     .btn-icon div { font-weight: bold; }
+
     .btn-stop { background: #ffcccc; color: #d00; font-size: 15px; font-weight: bold; }
   </style>
 </head>
@@ -67,13 +72,13 @@
 <a-scene
   vr-mode-ui="enabled: false"
   embedded
-  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+  arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
   renderer="precision: mediump; antialias: true; alpha: true;"
 >
   <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
   <a-light type="directional" position="-1 2 1" intensity="0.6"></a-light>
 
-  <a-camera position="0 1.6 5" look-controls="enabled: false"></a-camera>
+  <a-camera position="0 1.6 5" look-controls="enabled: true"></a-camera>
 
   <a-entity id="train"
             gltf-model="models/AR-Train_Nagai.glb"
@@ -113,6 +118,7 @@
 <script>
 /* ========== 車両操作ロジック ========== */
 const train = document.querySelector('#train');
+
 let speed = 0.05;
 let turnSpeedInPlace = 2.0; 
 let turnSpeedCurve = 1.0;   
@@ -164,6 +170,7 @@ setAction('btn-curve-left-back', -1, 1);
 setAction('btn-curve-right-back', -1, -1);
 document.getElementById('btn-stop').addEventListener('click', (e)=>{ e.preventDefault(); state.moving=0; state.turning=0; });
 
+/* 機能ボタン */
 document.getElementById('btn-up').onclick = () => train.object3D.position.y += 0.1;
 document.getElementById('btn-down').onclick = () => train.object3D.position.y -= 0.1;
 
@@ -175,7 +182,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 仕様3：顔写真（Face_Plate）の貼り付け ========== */
+/* ========== 仕様：顔写真（Face_Plate）設定 ========== */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -188,34 +195,32 @@ document.getElementById('btn-face').onclick = () => {
       tex.encoding = THREE.sRGBEncoding;
       tex.flipY = true; 
 
-      // 既存の Face_Plate を探す
+      // 仕様：オブジェクト名「Face_Plate」に貼り付ける
+      // まず既存の Face_Plate を探す
       let faceMesh = train.object3D.getObjectByName('Face_Plate');
 
       if (faceMesh) {
-        // モデル内に Face_Plate があればテクスチャを更新
+        // 既存があればテクスチャ更新
         if (faceMesh.material) {
           faceMesh.material.map = tex;
           faceMesh.material.needsUpdate = true;
-          // 表示崩れ防止設定
           faceMesh.material.depthTest = false;
           faceMesh.material.depthWrite = false;
           faceMesh.material.transparent = true;
           faceMesh.renderOrder = 999;
         }
       } else {
-        // モデルになければ、運転席の位置に新しく作成する
+        // なければ運転席の位置に作成
         const geo = new THREE.PlaneGeometry(0.7, 0.7);
         const mat = new THREE.MeshBasicMaterial({ 
           map: tex, side: THREE.DoubleSide, transparent:true,
           depthTest: false, depthWrite: false
         });
         faceMesh = new THREE.Mesh(geo, mat);
-        
-        // ★仕様通りオブジェクト名を「Face_Plate」に設定
-        faceMesh.name = 'Face_Plate';
+        faceMesh.name = 'Face_Plate'; // 仕様遵守
         faceMesh.renderOrder = 999; 
 
-        // 運転席の位置（右・上・手前）
+        // 運転席の位置（右側ウィンドウ）
         faceMesh.position.set(0.65, 2.35, 2.5); 
         
         train.object3D.add(faceMesh);
