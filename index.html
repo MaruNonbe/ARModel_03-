@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Face Fix Final</title>
+  <title>AR Train Face Adjust</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
 
   <style>
-    /* ========== UIデザイン（変更なし） ========== */
+    /* ========== UIデザイン ========== */
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden; background: transparent; font-family: sans-serif;
@@ -18,12 +18,12 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* UI配置 */
+    /* UI配置：上部はボタンが増えるため間隔調整 */
     #top-ui-container {
-      position: fixed; top: 20px; left: 0; width: 100%;
+      position: fixed; top: 10px; left: 0; width: 100%;
       z-index: 9999;
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px; pointer-events: none;
+      gap: 8px; pointer-events: none;
     }
     #bottom-ui-container {
       position: fixed; bottom: 30px; left: 0; width: 100%;
@@ -32,31 +32,37 @@
       gap: 10px; pointer-events: none;
     }
 
-    /* ボタンスタイル */
-    .ui-bar, .pad-grid {
+    /* ボタンバー */
+    .ui-bar {
+      display: flex; gap: 6px; pointer-events: auto;
+      background: rgba(255, 255, 255, 0.25);
+      padding: 5px 8px; border-radius: 15px;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      flex-wrap: wrap; justify-content: center; /* 画面幅が狭いときに折り返し */
+    }
+    .pad-grid {
+      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
+      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
       background: rgba(255, 255, 255, 0.25);
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       pointer-events: auto;
     }
-    .ui-bar { display: flex; gap: 8px; padding: 5px 10px; border-radius: 15px; }
-    .pad-grid {
-      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
-      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
-    }
 
+    /* ボタン共通 */
     .btn {
-      width: 60px; height: 60px;
-      background: #ffffff; border: none; border-radius: 12px;
+      width: 55px; height: 55px; /* 少し小さくして数を収める */
+      background: #ffffff; border: none; border-radius: 10px;
       display: flex; justify-content: center; align-items: center;
-      font-size: 26px; color: #556677;
+      font-size: 24px; color: #556677;
       box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
     .btn:active { transform: scale(0.96); background: #f5f5f5; }
 
-    .btn-icon { flex-direction: column; gap: 2px; font-size: 10px; color: #333; }
-    .btn-icon span { font-size: 22px; line-height: 1; }
-    .btn-icon div { font-weight: bold; }
+    .btn-icon { flex-direction: column; gap: 0px; font-size: 10px; color: #333; }
+    .btn-icon span { font-size: 20px; line-height: 1.2; }
+    .btn-icon div { font-weight: bold; transform: scale(0.9); } /* 文字少し小さく */
+    
     .btn-stop { background: #ffcccc; color: #d00; font-size: 15px; font-weight: bold; }
   </style>
 </head>
@@ -88,9 +94,16 @@
     <div class="btn btn-icon" id="btn-down"><span>⬇</span><div>低</div></div>
     <div class="btn btn-icon" id="btn-zoom-in"><span>🔍+</span></div>
     <div class="btn btn-icon" id="btn-zoom-out"><span>🔍-</span></div>
-  </div>
-  <div class="ui-bar">
     <div class="btn btn-icon" id="btn-capture"><span>📷</span><div>撮</div></div>
+  </div>
+
+  <div class="ui-bar">
+    <div class="btn btn-icon" id="face-x-minus"><span>←</span><div>顔X</div></div>
+    <div class="btn btn-icon" id="face-x-plus"><span>→</span><div>顔X</div></div>
+    <div class="btn btn-icon" id="face-y-plus"><span>↑</span><div>顔Y</div></div>
+    <div class="btn btn-icon" id="face-y-minus"><span>↓</span><div>顔Y</div></div>
+    <div class="btn btn-icon" id="face-s-plus"><span>＋</span><div>拡</div></div>
+    <div class="btn btn-icon" id="face-s-minus"><span>－</span><div>縮</div></div>
   </div>
 </div>
 
@@ -174,9 +187,38 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定（修正版：FileReader + TextureLoader） ========== */
+/* ========== 顔写真調整ロジック（位置・サイズ） ========== */
+function adjustFace(action) {
+  const face = train.object3D.getObjectByName('Face_Plate');
+  if (!face) return;
 
-// 1. 起動時に「白い板」を作成
+  const stepPos = 0.05; // 5cm移動
+  const stepScale = 0.1; // 10%拡縮
+
+  switch(action) {
+    // X軸移動
+    case 'x-': face.position.x -= stepPos; break;
+    case 'x+': face.position.x += stepPos; break;
+    // Y軸移動
+    case 'y-': face.position.y -= stepPos; break;
+    case 'y+': face.position.y += stepPos; break;
+    // 拡縮（中心点基準：単純にscaleを変更すれば中心基準になる）
+    case 's+': face.scale.multiplyScalar(1 + stepScale); break;
+    case 's-': face.scale.multiplyScalar(1 - stepScale); break;
+  }
+}
+
+document.getElementById('face-x-minus').onclick = () => adjustFace('x-');
+document.getElementById('face-x-plus').onclick = () => adjustFace('x+');
+document.getElementById('face-y-minus').onclick = () => adjustFace('y-');
+document.getElementById('face-y-plus').onclick = () => adjustFace('y+');
+document.getElementById('face-s-plus').onclick = () => adjustFace('s+');
+document.getElementById('face-s-minus').onclick = () => adjustFace('s-');
+
+
+/* ========== 顔写真設定（標準手法） ========== */
+
+// 1. 起動時に「白い板」を作成（初期座標 X=1.0, Y=2.84, Z=-0.5）
 train.addEventListener('model-loaded', () => {
   if (train.object3D.getObjectByName('Face_Plate')) return;
 
@@ -185,47 +227,37 @@ train.addEventListener('model-loaded', () => {
     color: 0xffffff,
     side: THREE.DoubleSide, 
     transparent: true,
-    depthTest: false, // 最前面表示
+    depthTest: false, // 手前表示
     depthWrite: false
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'Face_Plate';
   mesh.renderOrder = 9999; 
 
-  // ★仕様座標 (X=1.0, Y=2.84, Z=-0.5)
   mesh.position.set(1.0, 2.84, -0.5);
-  
   train.object3D.add(mesh);
 });
 
-// 2. 画像選択時の処理（より堅牢な読み込み方法）
+// 2. 画像選択（FileReader）
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
-  input.type = 'file'; 
-  input.accept = 'image/*';
-  
+  input.type = 'file'; input.accept = 'image/*';
   input.onchange = e => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // FileReaderを使用してデータを確実に読み込む
     const reader = new FileReader();
     reader.onload = function(event) {
       const dataUrl = event.target.result;
-      
-      // TextureLoaderにDataURLを渡してテクスチャ化
       new THREE.TextureLoader().load(dataUrl, (tex) => {
-        // テクスチャ設定
         tex.encoding = THREE.sRGBEncoding;
         tex.flipY = true; 
         
-        // プレートを探して適用
         const faceMesh = train.object3D.getObjectByName('Face_Plate');
         if (faceMesh && faceMesh.material) {
           faceMesh.material.map = tex;
-          faceMesh.material.color.setHex(0xffffff); // 色の影響を排除
-          faceMesh.material.needsUpdate = true; // ★最重要：更新フラグ
-          console.log("画像適用完了");
+          faceMesh.material.color.setHex(0xffffff); 
+          faceMesh.material.needsUpdate = true; 
         }
       });
     };
