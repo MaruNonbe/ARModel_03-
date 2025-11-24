@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Fixed Scenery 5m</title>
+  <title>AR Train Fixed Spec</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -32,7 +32,7 @@
       gap: 10px; pointer-events: none;
     }
 
-    /* ボタン背景（すりガラス風） */
+    /* ボタン背景 */
     .ui-bar {
       display: flex; gap: 8px; pointer-events: auto;
       background: rgba(255, 255, 255, 0.25);
@@ -49,7 +49,7 @@
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
 
-    /* ボタン共通（白い角丸） */
+    /* ボタン共通 */
     .btn {
       width: 60px; height: 60px;
       background: #ffffff; border: none; border-radius: 12px;
@@ -63,7 +63,6 @@
     .btn-icon { flex-direction: column; gap: 2px; font-size: 10px; color: #333; }
     .btn-icon span { font-size: 22px; line-height: 1; }
     .btn-icon div { font-weight: bold; }
-
     .btn-stop { background: #ffcccc; color: #d00; font-size: 15px; font-weight: bold; }
   </style>
 </head>
@@ -170,7 +169,6 @@ setAction('btn-curve-left-back', -1, 1);
 setAction('btn-curve-right-back', -1, -1);
 document.getElementById('btn-stop').addEventListener('click', (e)=>{ e.preventDefault(); state.moving=0; state.turning=0; });
 
-/* 機能ボタン */
 document.getElementById('btn-up').onclick = () => train.object3D.position.y += 0.1;
 document.getElementById('btn-down').onclick = () => train.object3D.position.y -= 0.1;
 
@@ -182,7 +180,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 仕様：顔写真（Face_Plate）設定 ========== */
+/* ========== 仕様：顔写真設定（確実なロジックへ復旧） ========== */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -190,41 +188,35 @@ document.getElementById('btn-face').onclick = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // ★以前の「確実に動作した」ロジック：
+    // 既存の Face_Plate があれば削除して、必ず新しく作り直す
+    const oldFace = train.object3D.getObjectByName('Face_Plate');
+    if(oldFace) train.object3D.remove(oldFace);
+
     const url = URL.createObjectURL(file);
     new THREE.TextureLoader().load(url, (tex) => {
       tex.encoding = THREE.sRGBEncoding;
       tex.flipY = true; 
 
-      // 仕様：オブジェクト名「Face_Plate」に貼り付ける
-      // まず既存の Face_Plate を探す
-      let faceMesh = train.object3D.getObjectByName('Face_Plate');
+      const geo = new THREE.PlaneGeometry(0.8, 0.8);
+      const mat = new THREE.MeshBasicMaterial({ 
+        map: tex, 
+        side: THREE.DoubleSide, 
+        transparent:true,
+        // ★重要：ガラスや壁に隠れないための設定
+        depthTest: false,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      
+      // ★仕様：オブジェクト名「Face_Plate」
+      mesh.name = 'Face_Plate';
+      mesh.renderOrder = 9999; // 最前面に描画
 
-      if (faceMesh) {
-        // 既存があればテクスチャ更新
-        if (faceMesh.material) {
-          faceMesh.material.map = tex;
-          faceMesh.material.needsUpdate = true;
-          faceMesh.material.depthTest = false;
-          faceMesh.material.depthWrite = false;
-          faceMesh.material.transparent = true;
-          faceMesh.renderOrder = 999;
-        }
-      } else {
-        // なければ運転席の位置に作成
-        const geo = new THREE.PlaneGeometry(0.7, 0.7);
-        const mat = new THREE.MeshBasicMaterial({ 
-          map: tex, side: THREE.DoubleSide, transparent:true,
-          depthTest: false, depthWrite: false
-        });
-        faceMesh = new THREE.Mesh(geo, mat);
-        faceMesh.name = 'Face_Plate'; // 仕様遵守
-        faceMesh.renderOrder = 999; 
-
-        // 運転席の位置（右側ウィンドウ）
-        faceMesh.position.set(0.65, 2.35, 2.5); 
-        
-        train.object3D.add(faceMesh);
-      }
+      // 運転席の位置（右側ウィンドウ）
+      mesh.position.set(0.65, 2.35, 2.5); 
+      
+      train.object3D.add(mesh);
     });
   };
   input.click();
