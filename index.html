@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Fixed Spec</title>
+  <title>AR Train Coord Fix</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -18,7 +18,7 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* UI配置（上下振り分け） */
+    /* UI配置 */
     #top-ui-container {
       position: fixed; top: 20px; left: 0; width: 100%;
       z-index: 9999;
@@ -32,24 +32,18 @@
       gap: 10px; pointer-events: none;
     }
 
-    /* ボタン背景 */
-    .ui-bar {
-      display: flex; gap: 8px; pointer-events: auto;
+    /* ボタンスタイル */
+    .ui-bar, .pad-grid {
       background: rgba(255, 255, 255, 0.25);
-      padding: 5px 10px; border-radius: 15px;
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    }
-    .pad-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.25);
-      padding: 15px; border-radius: 20px;
       pointer-events: auto;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .ui-bar { display: flex; gap: 8px; padding: 5px 10px; border-radius: 15px; }
+    .pad-grid {
+      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
+      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
     }
 
-    /* ボタン共通 */
     .btn {
       width: 60px; height: 60px;
       background: #ffffff; border: none; border-radius: 12px;
@@ -180,7 +174,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 仕様：顔写真設定（確実なロジックへ復旧） ========== */
+/* ========== 仕様：顔写真設定（座標修正） ========== */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -188,8 +182,7 @@ document.getElementById('btn-face').onclick = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // ★以前の「確実に動作した」ロジック：
-    // 既存の Face_Plate があれば削除して、必ず新しく作り直す
+    // 既存の Face_Plate を削除
     const oldFace = train.object3D.getObjectByName('Face_Plate');
     if(oldFace) train.object3D.remove(oldFace);
 
@@ -198,23 +191,25 @@ document.getElementById('btn-face').onclick = () => {
       tex.encoding = THREE.sRGBEncoding;
       tex.flipY = true; 
 
-      const geo = new THREE.PlaneGeometry(0.8, 0.8);
+      const geo = new THREE.PlaneGeometry(0.6, 0.6);
       const mat = new THREE.MeshBasicMaterial({ 
         map: tex, 
         side: THREE.DoubleSide, 
         transparent:true,
-        // ★重要：ガラスや壁に隠れないための設定
-        depthTest: false,
+        depthTest: false, // 手前表示
         depthWrite: false
       });
       const mesh = new THREE.Mesh(geo, mat);
       
-      // ★仕様：オブジェクト名「Face_Plate」
       mesh.name = 'Face_Plate';
-      mesh.renderOrder = 9999; // 最前面に描画
+      mesh.renderOrder = 9999; 
 
-      // 運転席の位置（右側ウィンドウ）
-      mesh.position.set(0.65, 2.35, 2.5); 
+      /* ★ご指定のプログラム座標設定 (単位: m)
+         Code X = 1.94
+         Code Y = 2.84
+         Code Z = 0.5
+      */
+      mesh.position.set(1.94, 2.84, 0.5); 
       
       train.object3D.add(mesh);
     });
