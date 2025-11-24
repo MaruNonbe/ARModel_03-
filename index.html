@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train FacePlate Fix</title>
+  <title>AR Train Fixed Final</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -181,13 +181,9 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定（Face_Plate対応版） ========== */
+/* ========== 顔写真設定（Face_Plate マテリアル置換版） ========== */
 document.getElementById('btn-face').onclick = () => {
-  // モデルがまだ読み込まれていなければ何もしない
-  if (!train.object3D) {
-    alert("モデルの読み込みをお待ちください。");
-    return;
-  }
+  if (!train.object3D) { alert("モデル読込中..."); return; }
 
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -198,31 +194,20 @@ document.getElementById('btn-face').onclick = () => {
     const url = URL.createObjectURL(file);
     new THREE.TextureLoader().load(url, (tex) => {
       tex.encoding = THREE.sRGBEncoding;
-      // モデルのUV設定によっては flipY = true が必要な場合があります。
-      // 上下逆になる場合はここを true に変更してください。
       tex.flipY = false; 
 
-      // ★修正点：モデル内の「Face_Plate」を探す
       const facePlate = train.object3D.getObjectByName('Face_Plate');
-
       if (facePlate) {
-        console.log("Face_Plate found, applying texture.");
-        // 既存のマテリアルをベースに、テクスチャを適用する
-        if (!facePlate.material.isMaterial) {
-           // マテリアルが未設定の場合の安全策（通常はGLTFロード時に設定される）
-           facePlate.material = new THREE.MeshBasicMaterial();
-        }
-        // テクスチャをセット
-        facePlate.material.map = tex;
-        // 両面表示、透過を有効にする（必要に応じて）
-        facePlate.material.side = THREE.DoubleSide;
-        facePlate.material.transparent = true;
-        // 更新フラグを立てる
-        facePlate.material.needsUpdate = true;
-
+        // ★ここが修正点：マテリアルを「MeshBasicMaterial」に完全に置き換える
+        // これにより、照明の影響を受けず、くっきり表示されます。
+        facePlate.material = new THREE.MeshBasicMaterial({
+          map: tex,
+          side: THREE.DoubleSide,
+          transparent: true
+        });
+        
       } else {
-        console.error("Face_Plate not found in the model.");
-        alert("モデル内に「Face_Plate」という名前のオブジェクトが見つかりませんでした。");
+        alert("モデル内に「Face_Plate」が見つかりません。");
       }
     });
   };
