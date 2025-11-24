@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AR Train Control Final</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    /* ========== 元のUIデザインを維持 ========== */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: sans-serif;
+      /* iPhone対策：長押し選択防止 */
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    a-scene {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* UIレイアウト */
+    #ui-container {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      pointer-events: none;
+    }
+
+    /* 上部ツールバー */
+    .top-bar {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    /* 3x3 コントローラー */
+    .pad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.3);
+      padding: 10px;
+      border-radius: 15px;
+      pointer-events: auto;
+    }
+
+    /* ボタン（元のデザイン：60px, 枠線2px） */
+    .btn {
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid #555;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 4px 0 #888;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    .btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #888;
+      background: #eee;
+    }
+
+    /* STOPボタン */
+    .btn-stop {
+      background: #ffcccc;
+      color: #c00;
+      font-size: 16px;
+    }
+
+    .icon-sm { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<a-scene
+  vr-mode-ui="enabled: false"
+  embedded
+  renderer="precision: mediump; antialias: true; alpha: true;"
+  arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+>
+  <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
+  <a-light type="directional" position="-1 2 1" intensity="0.5"></a-light>
+
+  <a-marker-camera preset="hiro">
+    <a-entity id="train"
+              gltf-model="models/AR-Train_Nagai.glb"
+              position="0 0 0"
+              scale="0.5 0.5 0.5">
+    </a-entity>
+  </a-marker-camera>
+</a-scene>
+
+<div id="ui-container">
+  
+  <div class="top-bar">
+    <div class="btn icon-sm" id="btn-face">🙂顔</div>
+    <div class="btn icon-sm" id="btn-up">⬆高</div>
+    <div class="btn icon-sm" id="btn-down">⬇低</div>
+    <div class="btn icon-sm" id="btn-zoom-in">🔍+</div>
+    <div class="btn icon-sm" id="btn-zoom-out">🔍-</div>
+  </div>
+  
+  <div class="top-bar">
+    <div class="btn icon-sm" id="btn-capture">📷</div>
+    <div class="btn icon-sm" id="btn-record">🎥</div>
+  </div>
+
+  <div class="pad-grid">
+    <div class="btn" id="btn-curve-left-fwd">↖</div>
+    <div class="btn" id="btn-fwd">↑</div>
+    <div class="btn" id="btn-curve-right-fwd">↗</div>
+
+    <div class="btn" id="btn-turn-left">↺</div>
+    <div class="btn btn-stop" id="btn-stop">STOP</div>
+    <div class="btn" id="btn-turn-right">↻</div>
+
+    <div class="btn" id="btn-curve-left-back">↙</div>
+    <div class="btn" id="btn-back">↓</div>
+    <div class="btn" id="btn-curve-right-back">↘</div>
+  </div>
+</div>
+
+<script>
+/* ========== ロジック修正版 ========== */
+const train = document.querySelector('#train');
+
+// 移動パラメータ
+let speed = 0.05;
+let turnSpeedInPlace = 2.0; 
+let turnSpeedCurve = 1.0;   
+let state = { moving: 0, turning: 0 };
+
+/* ループ処理 */
+function loop() {
+  requestAnimationFrame(loop);
+  
+  if (!train.object3D) return;
+  const mesh = train.object3D;
+
+  // 1. 回転
+  if (state.turning !== 0) {
+    let rotationAmount = 0;
+    if (state.moving !== 0) {
+      // カーブ走行
+      rotationAmount = THREE.MathUtils.degToRad(turnSpeedCurve) * state.turning;
+      if (state.moving === -1) rotationAmount *= -1; 
+    } else {
+      // その場回転
+      rotationAmount = THREE.MathUtils.degToRad(turnSpeedInPlace) * state.turning;
+    }
+    mesh.rotation.y += rotationAmount;
+  }
+
+  // 2. 移動
+  if (state.moving !== 0) {
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(mesh.quaternion);
+    forward.normalize();
+    mesh.position.addScaledVector(forward, state.moving * speed);
+  }
+}
+loop();
+
+/* ボタン操作 */
+function setAction(id, moveVal, turnVal) {
+  const btn = document.getElementById(id);
+  if(!btn) return;
+
+  const start = (e) => { 
+    if(e.cancelable) e.preventDefault(); 
+    state.moving = moveVal; 
+    state.turning = turnVal; 
+  };
+  const end = (e) => { 
+    if(e.cancelable) e.preventDefault(); 
+    state.moving = 0; 
+    state.turning = 0; 
+  };
+
+  btn.addEventListener('touchstart', start, {passive:false});
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('touchend', end, {passive:false});
+  btn.addEventListener('mouseup', end);
+  btn.addEventListener('mouseleave', end);
+}
+
+// 割り当て
+setAction('btn-fwd', 1, 0); 
+setAction('btn-back', -1, 0);
+setAction('btn-turn-left', 0, 1); 
+setAction('btn-turn-right', 0, -1);
+setAction('btn-curve-left-fwd', 1, 1); 
+setAction('btn-curve-right-fwd', 1, -1);
+setAction('btn-curve-left-back', -1, 1); 
+setAction('btn-curve-right-back', -1, -1);
+
+document.getElementById('btn-stop').addEventListener('click', (e)=>{ 
+  e.preventDefault(); state.moving=0; state.turning=0; 
+});
+
+/* ========== 顔写真（絶対見える修正版） ========== */
+document.getElementById('btn-face').onclick = () => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const oldFace = train.object3D.getObjectByName('custom_face');
+    if(oldFace) train.object3D.remove(oldFace);
+
+    const url = URL.createObjectURL(file);
+    new THREE.TextureLoader().load(url, (tex) => {
+      tex.encoding = THREE.sRGBEncoding;
+      tex.flipY = true; 
+
+      const geo = new THREE.PlaneGeometry(0.7, 0.7);
+      const mat = new THREE.MeshBasicMaterial({ 
+        map: tex, 
+        side: THREE.DoubleSide, 
+        transparent:true,
+        // ★重要：最前面表示
+        depthTest: false,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'custom_face';
+      mesh.renderOrder = 999; 
+
+      mesh.position.set(0, 1.7, 2.5); // 位置調整済み
+      train.object3D.add(mesh);
+    });
+  };
+  input.click();
+};
+
+/* その他機能 */
+document.getElementById('btn-up').onclick = () => train.object3D.position.y += 0.1;
+document.getElementById('btn-down').onclick = () => train.object3D.position.y -= 0.1;
+
+let curScale = 0.5;
+document.getElementById('btn-zoom-in').onclick = () => { 
+  curScale += 0.1; train.object3D.scale.set(curScale,curScale,curScale); 
+};
+document.getElementById('btn-zoom-out').onclick = () => { 
+  curScale = Math.max(0.1, curScale - 0.1); train.object3D.scale.set(curScale,curScale,curScale); 
+};
+
+document.getElementById('btn-capture').onclick = () => {
+  const cvs = document.querySelector('canvas');
+  cvs.toBlob(b=>{
+    const a=document.createElement('a'); 
+    a.href=URL.createObjectURL(b); 
+    a.download='ar.png'; 
+    a.click();
+  });
+};
+
+window.addEventListener('resize', () => {
+  const scene = document.querySelector('a-scene');
+  if(scene.camera) { 
+    scene.camera.aspect = window.innerWidth / window.innerHeight; 
+    scene.camera.updateProjectionMatrix(); 
+  }
+});
+</script>
+</body>
+</html>
