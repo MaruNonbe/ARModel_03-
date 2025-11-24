@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Fixed Final</title>
+  <title>AR Train Spatial Fix</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -78,7 +78,10 @@
   <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
   <a-light type="directional" position="-1 2 1" intensity="0.6"></a-light>
 
-  <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
+  <a-camera 
+    position="0 1.6 0" 
+    look-controls="enabled: true; touchEnabled: false; mouseEnabled: false">
+  </a-camera>
 
   <a-entity id="train"
             gltf-model="models/AR-Train_Nagai.glb"
@@ -181,7 +184,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定（Face_Plate マテリアル置換版） ========== */
+/* ========== 顔写真設定（Face_Plate対応） ========== */
 document.getElementById('btn-face').onclick = () => {
   if (!train.object3D) { alert("モデル読込中..."); return; }
 
@@ -194,30 +197,4 @@ document.getElementById('btn-face').onclick = () => {
     const url = URL.createObjectURL(file);
     new THREE.TextureLoader().load(url, (tex) => {
       tex.encoding = THREE.sRGBEncoding;
-      tex.flipY = false; 
-
-      const facePlate = train.object3D.getObjectByName('Face_Plate');
-      if (facePlate) {
-        // ★ここが修正点：マテリアルを「MeshBasicMaterial」に完全に置き換える
-        // これにより、照明の影響を受けず、くっきり表示されます。
-        facePlate.material = new THREE.MeshBasicMaterial({
-          map: tex,
-          side: THREE.DoubleSide,
-          transparent: true
-        });
-        
-      } else {
-        alert("モデル内に「Face_Plate」が見つかりません。");
-      }
-    });
-  };
-  input.click();
-};
-
-window.addEventListener('resize', () => {
-  const scene = document.querySelector('a-scene');
-  if(scene.camera) { scene.camera.aspect = window.innerWidth / window.innerHeight; scene.camera.updateProjectionMatrix(); }
-});
-</script>
-</body>
-</html>
+      tex.flipY = false
