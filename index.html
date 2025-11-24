@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Driver Seat Fix</title>
+  <title>AR Train Fixed Final</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
   <style>
     /* ========== UIデザイン（変更なし） ========== */
@@ -72,20 +72,19 @@
 <a-scene
   vr-mode-ui="enabled: false"
   embedded
-  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
   renderer="precision: mediump; antialias: true; alpha: true;"
+  arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
 >
-  <a-light type="ambient" color="#FFF" intensity="0.8"></a-light>
+  <a-light type="ambient" color="#FFF" intensity="0.9"></a-light>
   <a-light type="directional" position="-1 2 1" intensity="0.6"></a-light>
 
-  <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-
-  <a-entity id="train"
-            gltf-model="models/AR-Train_Nagai.glb"
-            position="0 0 -2"
-            rotation="0 0 0"
-            scale="0.5 0.5 0.5">
-  </a-entity>
+  <a-marker-camera preset="hiro">
+    <a-entity id="train"
+              gltf-model="models/AR-Train_Nagai.glb"
+              position="0 0 0"
+              scale="0.5 0.5 0.5">
+    </a-entity>
+  </a-marker-camera>
 </a-scene>
 
 <div id="top-ui-container">
@@ -181,7 +180,7 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真設定（位置修正：右上の運転席へ） ========== */
+/* ========== 顔写真設定（位置・サイズ修正版） ========== */
 document.getElementById('btn-face').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -202,7 +201,7 @@ document.getElementById('btn-face').onclick = () => {
         map: tex, 
         side: THREE.DoubleSide, 
         transparent:true,
-        // ガラスを突き抜けて表示
+        // ガラスを突き抜けて表示させる
         depthTest: false,
         depthWrite: false
       });
@@ -210,10 +209,8 @@ document.getElementById('btn-face').onclick = () => {
       mesh.name = 'custom_face';
       mesh.renderOrder = 999; 
 
-      // ★修正箇所：運転席の位置へ移動
-      // X=0.65 (右へ移動)
-      // Y=2.35 (窓の高さまで上げる)
-      // Z=2.5  (前面ガラス付近)
+      // ★座標修正：運転席の位置へ
+      // X=0.65(向かって右), Y=2.35(窓の高さ), Z=2.5(前面)
       mesh.position.set(0.65, 2.35, 2.5); 
       
       train.object3D.add(mesh);
