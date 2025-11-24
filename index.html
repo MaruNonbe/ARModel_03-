@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Train Face Adjust</title>
+  <title>AR Train AI Cutout</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
 
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+
   <style>
-    /* ========== UIデザイン ========== */
+    /* ========== UIデザイン（変更なし） ========== */
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden; background: transparent; font-family: sans-serif;
@@ -18,12 +20,12 @@
     }
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* UI配置：上部はボタンが増えるため間隔調整 */
+    /* UI配置 */
     #top-ui-container {
-      position: fixed; top: 10px; left: 0; width: 100%;
+      position: fixed; top: 20px; left: 0; width: 100%;
       z-index: 9999;
       display: flex; flex-direction: column; align-items: center;
-      gap: 8px; pointer-events: none;
+      gap: 10px; pointer-events: none;
     }
     #bottom-ui-container {
       position: fixed; bottom: 30px; left: 0; width: 100%;
@@ -32,37 +34,31 @@
       gap: 10px; pointer-events: none;
     }
 
-    /* ボタンバー */
-    .ui-bar {
-      display: flex; gap: 6px; pointer-events: auto;
-      background: rgba(255, 255, 255, 0.25);
-      padding: 5px 8px; border-radius: 15px;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      flex-wrap: wrap; justify-content: center; /* 画面幅が狭いときに折り返し */
-    }
-    .pad-grid {
-      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
-      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
+    /* ボタンスタイル */
+    .ui-bar, .pad-grid {
       background: rgba(255, 255, 255, 0.25);
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       pointer-events: auto;
     }
+    .ui-bar { display: flex; gap: 8px; padding: 5px 10px; border-radius: 15px; }
+    .pad-grid {
+      display: grid; gap: 8px; padding: 15px; border-radius: 20px;
+      grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
+    }
 
-    /* ボタン共通 */
     .btn {
-      width: 55px; height: 55px; /* 少し小さくして数を収める */
-      background: #ffffff; border: none; border-radius: 10px;
+      width: 60px; height: 60px;
+      background: #ffffff; border: none; border-radius: 12px;
       display: flex; justify-content: center; align-items: center;
-      font-size: 24px; color: #556677;
+      font-size: 26px; color: #556677;
       box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
     .btn:active { transform: scale(0.96); background: #f5f5f5; }
 
-    .btn-icon { flex-direction: column; gap: 0px; font-size: 10px; color: #333; }
-    .btn-icon span { font-size: 20px; line-height: 1.2; }
-    .btn-icon div { font-weight: bold; transform: scale(0.9); } /* 文字少し小さく */
-    
+    .btn-icon { flex-direction: column; gap: 2px; font-size: 10px; color: #333; }
+    .btn-icon span { font-size: 22px; line-height: 1; }
+    .btn-icon div { font-weight: bold; }
     .btn-stop { background: #ffcccc; color: #d00; font-size: 15px; font-weight: bold; }
   </style>
 </head>
@@ -94,16 +90,9 @@
     <div class="btn btn-icon" id="btn-down"><span>⬇</span><div>低</div></div>
     <div class="btn btn-icon" id="btn-zoom-in"><span>🔍+</span></div>
     <div class="btn btn-icon" id="btn-zoom-out"><span>🔍-</span></div>
-    <div class="btn btn-icon" id="btn-capture"><span>📷</span><div>撮</div></div>
   </div>
-
   <div class="ui-bar">
-    <div class="btn btn-icon" id="face-x-minus"><span>←</span><div>顔X</div></div>
-    <div class="btn btn-icon" id="face-x-plus"><span>→</span><div>顔X</div></div>
-    <div class="btn btn-icon" id="face-y-plus"><span>↑</span><div>顔Y</div></div>
-    <div class="btn btn-icon" id="face-y-minus"><span>↓</span><div>顔Y</div></div>
-    <div class="btn btn-icon" id="face-s-plus"><span>＋</span><div>拡</div></div>
-    <div class="btn btn-icon" id="face-s-minus"><span>－</span><div>縮</div></div>
+    <div class="btn btn-icon" id="btn-capture"><span>📷</span><div>撮</div></div>
   </div>
 </div>
 
@@ -187,79 +176,117 @@ document.getElementById('btn-capture').onclick = () => {
   cvs.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar_snapshot.png'; a.click(); });
 };
 
-/* ========== 顔写真調整ロジック（位置・サイズ） ========== */
-function adjustFace(action) {
-  const face = train.object3D.getObjectByName('Face_Plate');
-  if (!face) return;
+/* ========== AI背景削除の準備 ========== */
+let selfieSegmentation = null;
+let isAiLoaded = false;
 
-  const stepPos = 0.05; // 5cm移動
-  const stepScale = 0.1; // 10%拡縮
+// MediaPipeの初期化
+function initMediaPipe() {
+  selfieSegmentation = new SelfieSegmentation({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+  }});
+  selfieSegmentation.setOptions({
+    modelSelection: 1, // 0:一般, 1:風景(精度高)
+  });
+  selfieSegmentation.onResults(onAiResults);
+  isAiLoaded = true;
+  console.log("AI Model Loaded");
+}
+// ページ読み込み後にAI準備開始
+window.addEventListener('load', initMediaPipe);
 
-  switch(action) {
-    // X軸移動
-    case 'x-': face.position.x -= stepPos; break;
-    case 'x+': face.position.x += stepPos; break;
-    // Y軸移動
-    case 'y-': face.position.y -= stepPos; break;
-    case 'y+': face.position.y += stepPos; break;
-    // 拡縮（中心点基準：単純にscaleを変更すれば中心基準になる）
-    case 's+': face.scale.multiplyScalar(1 + stepScale); break;
-    case 's-': face.scale.multiplyScalar(1 - stepScale); break;
-  }
+// AI処理結果を受け取る変数
+let tempImg = null; // 元画像保持用
+
+// AI処理完了時のコールバック
+function onAiResults(results) {
+  // キャンバスを作成して切り抜き合成を行う
+  const canvas = document.createElement('canvas');
+  canvas.width = results.image.width;
+  canvas.height = results.image.height;
+  const ctx = canvas.getContext('2d');
+
+  // 1. マスクを描画
+  ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+  
+  // 2. 合成モード変更（マスクがある部分だけ元画像を残す）
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+  // 3. データURL化
+  const processedDataUrl = canvas.toDataURL('image/png');
+
+  // 4. テクスチャとして適用
+  new THREE.TextureLoader().load(processedDataUrl, (tex) => {
+    tex.encoding = THREE.sRGBEncoding;
+    tex.flipY = true;
+    
+    const faceMesh = train.object3D.getObjectByName('Face_Plate');
+    if (faceMesh && faceMesh.material) {
+      faceMesh.material.map = tex;
+      faceMesh.material.color.setHex(0xffffff);
+      faceMesh.material.needsUpdate = true;
+      alert("AI切り抜き完了！");
+    }
+  });
 }
 
-document.getElementById('face-x-minus').onclick = () => adjustFace('x-');
-document.getElementById('face-x-plus').onclick = () => adjustFace('x+');
-document.getElementById('face-y-minus').onclick = () => adjustFace('y-');
-document.getElementById('face-y-plus').onclick = () => adjustFace('y+');
-document.getElementById('face-s-plus').onclick = () => adjustFace('s+');
-document.getElementById('face-s-minus').onclick = () => adjustFace('s-');
 
+/* ========== 顔写真設定（AI自動切り抜き版） ========== */
 
-/* ========== 顔写真設定（標準手法） ========== */
-
-// 1. 起動時に「白い板」を作成（初期座標 X=1.0, Y=2.84, Z=-0.5）
+// 1. 起動時に白い板作成（プレースホルダ）
 train.addEventListener('model-loaded', () => {
   if (train.object3D.getObjectByName('Face_Plate')) return;
 
   const geo = new THREE.PlaneGeometry(0.6, 0.6);
   const mat = new THREE.MeshBasicMaterial({ 
-    color: 0xffffff,
-    side: THREE.DoubleSide, 
-    transparent: true,
-    depthTest: false, // 手前表示
-    depthWrite: false
+    color: 0xffffff, side: THREE.DoubleSide, transparent: true,
+    depthTest: false, depthWrite: false
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'Face_Plate';
   mesh.renderOrder = 9999; 
 
+  // ★指定座標 (X=1.0, Y=2.84, Z=-0.5)
   mesh.position.set(1.0, 2.84, -0.5);
+  
   train.object3D.add(mesh);
 });
 
-// 2. 画像選択（FileReader）
+// 2. 画像選択時の処理
 document.getElementById('btn-face').onclick = () => {
+  if (!isAiLoaded) {
+    alert("AIモデルの準備中です...少々お待ちください");
+    return;
+  }
+
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
+  
   input.onchange = e => {
     const file = e.target.files[0];
     if (!file) return;
+    alert("AI処理中...（数秒かかります）");
 
     const reader = new FileReader();
     reader.onload = function(event) {
-      const dataUrl = event.target.result;
-      new THREE.TextureLoader().load(dataUrl, (tex) => {
-        tex.encoding = THREE.sRGBEncoding;
-        tex.flipY = true; 
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = async () => {
+        // リサイズしてからAIに渡す（高速化・安定化）
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 512; // AI処理用に小さくする
+        let w = img.width; let h = img.height;
+        if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE/w; w = MAX_SIZE; } }
+        else { if (h > MAX_SIZE) { w *= MAX_SIZE/h; h = MAX_SIZE; } }
         
-        const faceMesh = train.object3D.getObjectByName('Face_Plate');
-        if (faceMesh && faceMesh.material) {
-          faceMesh.material.map = tex;
-          faceMesh.material.color.setHex(0xffffff); 
-          faceMesh.material.needsUpdate = true; 
-        }
-      });
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        // AIに送信
+        await selfieSegmentation.send({image: canvas});
+      };
     };
     reader.readAsDataURL(file);
   };
